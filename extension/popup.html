@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AI Page Summarizer</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <main class="app">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Current Page</p>
+          <h1 id="pageTitle">Loading page...</h1>
+        </div>
+      </header>
+
+      <section class="actions" aria-label="Summary controls">
+        <button id="summarizeBtn" class="primary-btn">
+          Summarize Page
+        </button>
+
+        <button id="clearBtn" class="secondary-btn">
+          Clear
+        </button>
+      </section>
+
+      <section class="options">
+        <label for="summaryMode">Summary style</label>
+        <select id="summaryMode">
+          <option value="structured">Structured summary</option>
+          <option value="three_bullets">3 bullet points</option>
+          <option value="insights">Key insights only</option>
+        </select>
+      </section>
+
+      <div id="loading" class="loading hidden" role="status">
+        <span class="spinner"></span>
+        <span>Summarizing page...</span>
+      </div>
+
+      <p id="error" class="error hidden"></p>
+
+      <section id="summaryContainer" class="summary hidden" aria-live="polite">
+        <div class="summary-meta">
+          <span id="readingTime"></span>
+          <button id="copyBtn" class="copy-btn">Copy</button>
+        </div>
+
+        <div id="summaryOutput"></div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "AI Page Summarizer",
+  "version": "1.0.0",
+  "description": "Summarize the current webpage using AI.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["http://localhost:4000/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Summarize Page"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/star.png",
+    "48": "icons/star.png",
+    "128": "icons/star.png"
+  }
+}
