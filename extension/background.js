@@ -1,4 +1,6 @@
 const API_BASE_URL = "http://localhost:4000";
+const minimumRequestInterval = 2500;
+let lastRequestAt = 0;
 
 function getCacheKey(url, mode) {
   return `summary:${mode}:${url}`;
@@ -28,7 +30,9 @@ async function callSummaryApi({ title, url, content, wordCount, mode }) {
     })
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({
+    error: "The summarizer server returned an invalid response."
+  }));
 
   if (!response.ok) {
     throw new Error(data.error || "AI summary request failed.");
@@ -65,10 +69,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         };
       }
 
+      const now = Date.now();
+      const waitMs = minimumRequestInterval - (now - lastRequestAt);
+
+      if (waitMs > 0) {
+        return {
+          ok: false,
+          error: `Please wait ${Math.ceil(waitMs / 1000)} seconds before summarizing again.`
+        };
+      }
+
+      lastRequestAt = now;
+
       const summary = await callSummaryApi({
         ...pageData,
         mode: safeMode
       });
+      summary.wordCount = pageData.wordCount || 0;
 
       await saveToStorage(cacheKey, summary);
 

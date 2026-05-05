@@ -32,6 +32,22 @@
           <option value="three_bullets">3 bullet points</option>
           <option value="insights">Key insights only</option>
         </select>
+
+        <div class="option-grid">
+          <label class="check-option">
+            <input id="highlightToggle" type="checkbox" checked />
+            <span>Highlight key sections</span>
+          </label>
+
+          <label class="theme-option" for="themeMode">
+            <span>Theme</span>
+            <select id="themeMode">
+              <option value="auto">Auto</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+        </div>
       </section>
 
       <div id="loading" class="loading hidden" role="status">
@@ -43,7 +59,7 @@
 
       <section id="summaryContainer" class="summary hidden" aria-live="polite">
         <div class="summary-meta">
-          <span id="readingTime"></span>
+          <span id="summaryStats"></span>
           <button id="copyBtn" class="copy-btn">Copy</button>
         </div>
 

@@ -3,14 +3,17 @@ const summarizeBtn = document.getElementById("summarizeBtn");
 const clearBtn = document.getElementById("clearBtn");
 const copyBtn = document.getElementById("copyBtn");
 const summaryMode = document.getElementById("summaryMode");
+const highlightToggle = document.getElementById("highlightToggle");
+const themeMode = document.getElementById("themeMode");
 const loading = document.getElementById("loading");
 const errorBox = document.getElementById("error");
 const summaryContainer = document.getElementById("summaryContainer");
 const summaryOutput = document.getElementById("summaryOutput");
-const readingTime = document.getElementById("readingTime");
+const summaryStats = document.getElementById("summaryStats");
 
 let currentTab = null;
 let latestSummaryText = "";
+const settingsKey = "popupSettings";
 
 function setLoading(isLoading) {
   loading.classList.toggle("hidden", !isLoading);
@@ -25,6 +28,10 @@ function showError(message) {
 function clearError() {
   errorBox.textContent = "";
   errorBox.classList.add("hidden");
+}
+
+function canAccessTab(tab) {
+  return /^https?:\/\//.test(tab?.url || "");
 }
 
 function escapeHtml(value) {
@@ -47,7 +54,31 @@ function renderList(title, items) {
   `;
 }
 
-function renderSummary(summary) {
+function applyTheme(theme) {
+  document.body.dataset.theme = theme || "auto";
+}
+
+async function loadSettings() {
+  const stored = await chrome.storage.local.get(settingsKey);
+  const settings = stored[settingsKey] || {};
+
+  summaryMode.value = settings.summaryMode || "structured";
+  highlightToggle.checked = settings.highlightImportantSections !== false;
+  themeMode.value = settings.themeMode || "auto";
+  applyTheme(themeMode.value);
+}
+
+async function saveSettings() {
+  const settings = {
+    summaryMode: summaryMode.value,
+    highlightImportantSections: highlightToggle.checked,
+    themeMode: themeMode.value
+  };
+
+  await chrome.storage.local.set({ [settingsKey]: settings });
+}
+
+function renderSummary(summary, metadata = {}) {
   const html = [
     renderList("Summary", summary.bullets),
     renderList("Key Insights", summary.insights),
@@ -56,9 +87,25 @@ function renderSummary(summary) {
 
   summaryOutput.innerHTML = html || "<p>No summary available.</p>";
 
-  readingTime.textContent = summary.estimatedReadingTime
-    ? `${summary.estimatedReadingTime} min read`
-    : "";
+  const stats = [];
+
+  if (summary.estimatedReadingTime) {
+    stats.push(`${summary.estimatedReadingTime} min read`);
+  }
+
+  if (summary.wordCount) {
+    stats.push(`${summary.wordCount.toLocaleString()} words`);
+  }
+
+  if (metadata.cached) {
+    stats.push("cached");
+  }
+
+  if (summary.model) {
+    stats.push(summary.model);
+  }
+
+  summaryStats.textContent = stats.join(" · ");
 
   latestSummaryText = [
     "Summary:",
@@ -84,7 +131,20 @@ async function getActiveTab() {
 }
 
 async function sendMessageToTab(tabId, message) {
-  return await chrome.tabs.sendMessage(tabId, message);
+  try {
+    return await chrome.tabs.sendMessage(tabId, message);
+  } catch (error) {
+    if (!error.message?.includes("Receiving end does not exist")) {
+      throw error;
+    }
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content.js"]
+    });
+
+    return await chrome.tabs.sendMessage(tabId, message);
+  }
 }
 
 async function sendMessageToBackground(message) {
@@ -92,6 +152,8 @@ async function sendMessageToBackground(message) {
 }
 
 async function initializePopup() {
+  await loadSettings();
+
   currentTab = await getActiveTab();
 
   if (!currentTab) {
@@ -101,6 +163,11 @@ async function initializePopup() {
   }
 
   pageTitle.textContent = currentTab.title || "Untitled Page";
+
+  if (!canAccessTab(currentTab)) {
+    showError("Open an article or webpage to summarize. Browser pages cannot be read by extensions.");
+    summarizeBtn.disabled = true;
+  }
 }
 
 async function summarizeCurrentPage() {
@@ -130,11 +197,19 @@ async function summarizeCurrentPage() {
       throw new Error(result.error);
     }
 
-    renderSummary(result.data);
-
-    await sendMessageToTab(currentTab.id, {
-      type: "HIGHLIGHT_IMPORTANT_SECTIONS"
+    renderSummary(result.data, {
+      cached: result.cached
     });
+
+    if (highlightToggle.checked) {
+      try {
+        await sendMessageToTab(currentTab.id, {
+          type: "HIGHLIGHT_IMPORTANT_SECTIONS"
+        });
+      } catch {
+        // Highlighting is optional; keep the summary visible if page styling blocks it.
+      }
+    }
   } catch (error) {
     showError(error.message || "Failed to summarize page.");
   } finally {
@@ -153,6 +228,16 @@ async function clearSummary() {
       type: "CLEAR_SUMMARY_CACHE",
       url: currentTab.url
     });
+
+    if (currentTab.id && canAccessTab(currentTab)) {
+      try {
+        await sendMessageToTab(currentTab.id, {
+          type: "CLEAR_HIGHLIGHTS"
+        });
+      } catch {
+        // Ignore optional highlight cleanup failures on restricted pages.
+      }
+    }
   }
 }
 
@@ -170,5 +255,11 @@ async function copySummary() {
 summarizeBtn.addEventListener("click", summarizeCurrentPage);
 clearBtn.addEventListener("click", clearSummary);
 copyBtn.addEventListener("click", copySummary);
+summaryMode.addEventListener("change", saveSettings);
+highlightToggle.addEventListener("change", saveSettings);
+themeMode.addEventListener("change", () => {
+  applyTheme(themeMode.value);
+  saveSettings();
+});
 
 initializePopup();
